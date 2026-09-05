@@ -1,1 +1,46 @@
+name: Build ElytraSwap
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extract ElytraSwap ZIP
+        run: |
+          mkdir extracted
+          ZIP=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+          echo "ZIP: $ZIP"
+          unzip -o "$ZIP" -d extracted
+          PROJECT=$(find extracted -type f -name gradlew -print -quit | xargs dirname)
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          echo "Project folder: $PROJECT"
+
+      - name: Fix Fabric Loom
+        run: |
+          sed -i "s/id 'fabric-loom-remap'/id 'net.fabricmc.fabric-loom-remap'/" "$PROJECT/build.gradle"
+
+      - name: Make Gradle executable
+        run: chmod +x "$PROJECT/gradlew"
+
+      - name: Build Mod
+        run: |
+          cd "$PROJECT"
+          ./gradlew build --no-daemon
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElytraSwap-JAR
+          path: "${{ env.PROJECT }}/build/libs/*.jar"
